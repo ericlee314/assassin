@@ -1,8 +1,13 @@
-/*
- * Taken from Dr. Leong's ggrfid. http://www.grantgibson.co.uk/2012/04/how-to-get-started-with-the-mifare-mf522-an-and-arduino/
+/* 
+* Taken from Dr. Leong's ggrfid. http://www.grantgibson.co.uk/2012/04/how-to-get-started-with-the-mifare-mf522-an-and-arduino/
  * INTEL WEARABLE GAMING DEVELOPERS CONFERENCE HACKATON
  * Author: Ted Xiao
- * Pin setup:
+ * Modified byï¼š Eng. Robson (robson.eletronico@gmail.com)
+ * Modifiedï¼š Translation from Chinese to English (by google)
+ * Functional Descriptionï¼šMifare1 Anti-collision find cards â†’ â†’ â†’ Select card reader interface
+ 
+ 
+  * Pin setup:
  * GRND, 13 to SCK, 12 to MISO, 11 to MOSI, 9 to NSS, 10 to RST, VCC to 3.3V
  * Funduino RFID-RC522
  */
@@ -12,7 +17,7 @@
 #define	uchar	unsigned char
 #define	uint	unsigned int
 
-//数组最大长度
+//Maximum length of the array
 #define MAX_LEN 16
 
 /////////////////////////////////////////////////////////////////////
@@ -20,46 +25,39 @@
 /////////////////////////////////////////////////////////////////////
 const int chipSelectPin = 9;
 const int NRSTPD = 5;
-const int ledPin1 = 2;
-const int ledPin2 = 3;
-const int ledPin3 = 4;
-int state1 = LOW;
-int state2 = LOW;
-int state3 = LOW;
+
+//MF522 Command word
+#define PCD_IDLE              0x00               //NO action; Cancel the current command
+#define PCD_AUTHENT           0x0E               //Authentication Key
+#define PCD_RECEIVE           0x08               //Receive Data
+#define PCD_TRANSMIT          0x04               //Transmit data
+#define PCD_TRANSCEIVE        0x0C               //Transmit and receive data,
+#define PCD_RESETPHASE        0x0F               //Reset
+#define PCD_CALCCRC           0x03               //CRC Calculate
+
+// Mifare_One card command word
+# define PICC_REQIDL          0x26               // find the antenna area does not enter hibernation
+# define PICC_REQALL          0x52               // find all the cards antenna area
+# define PICC_ANTICOLL        0x93               // anti-collision
+# define PICC_SElECTTAG       0x93               // election card
+# define PICC_AUTHENT1A       0x60               // authentication key A
+# define PICC_AUTHENT1B       0x61               // authentication key B
+# define PICC_READ            0x30               // Read Block
+# define PICC_WRITE           0xA0               // write block
+# define PICC_DECREMENT       0xC0               // debit
+# define PICC_INCREMENT       0xC1               // recharge
+# define PICC_RESTORE         0xC2               // transfer block data to the buffer
+# define PICC_TRANSFER        0xB0               // save the data in the buffer
+# define PICC_HALT            0x50               // Sleep
 
 
-//MF522命令字
-#define PCD_IDLE              0x00               //NO action;取消当前命令
-#define PCD_AUTHENT           0x0E               //验证密钥
-#define PCD_RECEIVE           0x08               //接收数据
-#define PCD_TRANSMIT          0x04               //发送数据
-#define PCD_TRANSCEIVE        0x0C               //发送并接收数据
-#define PCD_RESETPHASE        0x0F               //复位
-#define PCD_CALCCRC           0x03               //CRC计算
-
-//Mifare_One卡片命令字
-#define PICC_REQIDL           0x26               //寻天线区内未进入休眠状态
-#define PICC_REQALL           0x52               //寻天线区内全部卡
-#define PICC_ANTICOLL         0x93               //防冲撞
-#define PICC_SElECTTAG        0x93               //选卡
-#define PICC_AUTHENT1A        0x60               //验证A密钥
-#define PICC_AUTHENT1B        0x61               //验证B密钥
-#define PICC_READ             0x30               //读块
-#define PICC_WRITE            0xA0               //写块
-#define PICC_DECREMENT        0xC0               //扣款
-#define PICC_INCREMENT        0xC1               //充值
-#define PICC_RESTORE          0xC2               //调块数据到缓冲区
-#define PICC_TRANSFER         0xB0               //保存缓冲区中数据
-#define PICC_HALT             0x50               //休眠
-
-
-//和MF522通讯时返回的错误代码
+//And MF522 The error code is returned when communication
 #define MI_OK                 0
 #define MI_NOTAGERR           1
 #define MI_ERR                2
 
 
-//------------------MFRC522寄存器---------------
+//------------------MFRC522 Register---------------
 //Page 0:Command and Status
 #define     Reserved00            0x00    
 #define     CommandReg            0x01    
@@ -127,37 +125,18 @@ int state3 = LOW;
 #define     Reserved31            0x3C   
 #define     Reserved32            0x3D   
 #define     Reserved33            0x3E   
-#define     Reserved34			  0x3F
+#define     Reserved34		  0x3F
 //-----------------------------------------------
-
-//4字节卡序列号，第5字节为校验字节
 uchar serNum[5];
 
-uchar  writeData[16]={0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 100};  //初始化 100元钱
-uchar  moneyConsume = 18 ;  //消费18元
-uchar  moneyAdd = 10 ;  //充值10元
-//扇区A密码，16个扇区，每个扇区密码6Byte
- uchar sectorKeyA[16][16] = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-                             {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-                             //{0x19, 0x84, 0x07, 0x15, 0x76, 0x14},
-                             {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-                            };
- uchar sectorNewKeyA[16][16] = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},
-                                {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xff,0x07,0x80,0x69, 0x19,0x84,0x07,0x15,0x76,0x14},
-                                 //you can set another ket , such as  " 0x19, 0x84, 0x07, 0x15, 0x76, 0x14 "
-                                 //{0x19, 0x84, 0x07, 0x15, 0x76, 0x14, 0xff,0x07,0x80,0x69, 0x19,0x84,0x07,0x15,0x76,0x14},
-                                 // but when loop, please set the  sectorKeyA, the same key, so that RFID module can read the card
-                                {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xff,0x07,0x80,0x69, 0x19,0x33,0x07,0x15,0x34,0x14},
-                               };
-
 void setup() {                
-   Serial.begin(9600);                       // RFID reader SOUT pin connected to Serial RX pin at 2400bps 
+   Serial.begin(19200);                       // RFID reader SOUT pin connected to Serial RX pin at 2400bps 
  // start the SPI library:
   SPI.begin();
   
-  pinMode(chipSelectPin,OUTPUT);             // Set digital pin 10 as OUTPUT to connect it to the RFID /ENABLE pin 
+  pinMode(chipSelectPin,OUTPUT);             // Set digital pin 9 as OUTPUT to connect it to the RFID /ENABLE pin 
     digitalWrite(chipSelectPin, LOW);          // Activate the RFID reader
-  pinMode(NRSTPD,OUTPUT);               // Set digital pin 10 , Not Reset and Power-down
+  pinMode(NRSTPD,OUTPUT);               // Set digital pin 5 , Not Reset and Power-down
     digitalWrite(NRSTPD, HIGH);
 
   MFRC522_Init();  
@@ -165,103 +144,69 @@ void setup() {
 
 void loop()
 {
-  	uchar i,tmp;
+  	uchar i,tmp, checksum1;
 	uchar status;
         uchar str[MAX_LEN];
         uchar RC_size;
-        uchar blockAddr;	//选择操作的块地址0～63
+        uchar blockAddr;	//Selection operation block address 0 to 63
         String mynum = "";
 
 
-		//寻卡，返回卡类型	
+		//Find cards, return card type
 		status = MFRC522_Request(PICC_REQIDL, str);	
 		if (status == MI_OK)
 		{
-                        Serial.println("Card detected");
+                       Serial.println("Card detected");
 			//Serial.print(str[0],BIN);
                         //Serial.print(" , ");
 			//Serial.print(str[1],BIN);
                         //Serial.println(" ");
 		}
 
-		//防冲撞，返回卡的序列号 4字节
+		//Anti-collision, return card serial number 4 bytes
 		status = MFRC522_Anticoll(str);
 		memcpy(serNum, str, 5);
 		if (status == MI_OK)
 		{
-
                         Serial.println("The card's number is  : ");
 			Serial.print(serNum[0]);
-                        //Serial.print(" , ");
-			//Serial.print(serNum[1],BIN);
-                        //Serial.print(" , ");
-			//Serial.print(serNum[2],BIN);
-                        //Serial.print(" , ");
-			//Serial.print(serNum[3],BIN);
-                        //Serial.print(" , ");
-			//Serial.print(serNum[4],BIN);
+
                         Serial.println(" ");
                         
                         // Should really check all pairs, but for now we'll just use the first
                      
                         if(serNum[0] == 52 ) {
                           Serial.println("Card 52 detected");
-                          // if the LED is off turn it on and vice-versa:
-                          if (state1 == LOW) {
-                            state1 = HIGH;
-                            digitalWrite(ledPin1, state1);
-                          }
-                          else {
-                            state1 = LOW;
-                            digitalWrite(ledPin1, state1);
-                          }
-                        // set the LED with the ledState of the variable:
-                          
+                          // if the LED is off turn it on and vice-versa:                      
+                      
                         }
                         else if(serNum[0] == 84) {
                           Serial.println("Card 84 Detected");
-                          if (state2 == LOW) {
-                            state2 = HIGH;
-                            digitalWrite(ledPin2, HIGH);
-                          }
-                         else {
-                          state2 = LOW;
-                          digitalWrite(ledPin2, LOW);
-                         }
+
                          Serial.println("Test");
                         }
                         else if(serNum[0] == 117) {
                           Serial.println("Card 117 Detected");
-                          if (state3 == LOW) {
-                            state3 = HIGH;
-                            //digitalWrite(ledPin3, HIGH);
-                            digitalWrite(ledPin3, state3);
-                          }
-                         else if (state3 == HIGH) {
-                          state3 = LOW;
-                          digitalWrite(ledPin3, LOW);
-                          Serial.println("High to Low");
-                         }
                          
                         }
-                        delay(1000);
+                        delay(10);
 		}
                 //Serial.println(" ");
-		MFRC522_Halt();			//命令卡片进入休眠状态              
+		//MFRC522_Halt();			//Command card into hibernation              
           
 }
 
 /*
- * 函 数 名：Write_MFRC5200
- * 功能描述：向MFRC522的某一寄存器写一个字节数据
- * 输入参数：addr--寄存器地址；val--要写入的值
- * 返 回 值：无
+ * Function Nameï¼šWrite_MFRC5200
+ * Function Description: To a certain MFRC522 register to write a byte of data
+ * Input Parametersï¼šaddr - register address; val - the value to be written
+ * Return value: None
  */
 void Write_MFRC522(uchar addr, uchar val)
 {
 	digitalWrite(chipSelectPin, LOW);
 
-	//地址格式：0XXXXXX0
+	//Address Formatï¼š0XXXXXX0
 	SPI.transfer((addr<<1)&0x7E);	
 	SPI.transfer(val);
 	
@@ -270,10 +215,10 @@ void Write_MFRC522(uchar addr, uchar val)
 
 
 /*
- * 函 数 名：Read_MFRC522
- * 功能描述：从MFRC522的某一寄存器读一个字节数据
- * 输入参数：addr--寄存器地址
- * 返 回 值：返回读取到的一个字节数据
+ * Function Nameï¼šRead_MFRC522
+ * Description: From a certain MFRC522 read a byte of data register
+ * Input Parameters: addr - register address
+ * Returns: a byte of data read from the
  */
 uchar Read_MFRC522(uchar addr)
 {
@@ -281,7 +226,7 @@ uchar Read_MFRC522(uchar addr)
 
 	digitalWrite(chipSelectPin, LOW);
 
-	//地址格式：1XXXXXX0
+	//Address Formatï¼š1XXXXXX0
 	SPI.transfer(((addr<<1)&0x7E) | 0x80);	
 	val =SPI.transfer(0x00);
 	
@@ -291,10 +236,10 @@ uchar Read_MFRC522(uchar addr)
 }
 
 /*
- * 函 数 名：SetBitMask
- * 功能描述：置RC522寄存器位
- * 输入参数：reg--寄存器地址;mask--置位值
- * 返 回 值：无
+ * Function Nameï¼šSetBitMask
+ * Description: Set RC522 register bit
+ * Input parameters: reg - register address; mask - set value
+ * Return value: None
  */
 void SetBitMask(uchar reg, uchar mask)  
 {
@@ -305,11 +250,11 @@ void SetBitMask(uchar reg, uchar mask)
 
 
 /*
- * 函 数 名：ClearBitMask
- * 功能描述：清RC522寄存器位
- * 输入参数：reg--寄存器地址;mask--清位值
- * 返 回 值：无
- */
+ * Function Name: ClearBitMask
+ * Description: clear RC522 register bit
+ * Input parameters: reg - register address; mask - clear bit value
+ * Return value: None
+*/
 void ClearBitMask(uchar reg, uchar mask)  
 {
     uchar tmp;
@@ -319,10 +264,10 @@ void ClearBitMask(uchar reg, uchar mask)
 
 
 /*
- * 函 数 名：AntennaOn
- * 功能描述：开启天线,每次启动或关闭天险发射之间应至少有1ms的间隔
- * 输入参数：无
- * 返 回 值：无
+ * Function Nameï¼šAntennaOn
+ * Description: Open antennas, each time you start or shut down the natural barrier between the transmitter should be at least 1ms interval
+ * Input: None
+ * Return value: None
  */
 void AntennaOn(void)
 {
@@ -337,10 +282,10 @@ void AntennaOn(void)
 
 
 /*
- * 函 数 名：AntennaOff
- * 功能描述：关闭天线,每次启动或关闭天险发射之间应至少有1ms的间隔
- * 输入参数：无
- * 返 回 值：无
+  * Function Name: AntennaOff
+  * Description: Close antennas, each time you start or shut down the natural barrier between the transmitter should be at least 1ms interval
+  * Input: None
+  * Return value: None
  */
 void AntennaOff(void)
 {
@@ -349,10 +294,10 @@ void AntennaOff(void)
 
 
 /*
- * 函 数 名：ResetMFRC522
- * 功能描述：复位RC522
- * 输入参数：无
- * 返 回 值：无
+ * Function Name: ResetMFRC522
+ * Description: Reset RC522
+ * Input: None
+ * Return value: None
  */
 void MFRC522_Reset(void)
 {
@@ -361,11 +306,11 @@ void MFRC522_Reset(void)
 
 
 /*
- * 函 数 名：InitMFRC522
- * 功能描述：初始化RC522
- * 输入参数：无
- * 返 回 值：无
- */
+ * Function Nameï¼šInitMFRC522
+ * Description: Initialize RC522
+ * Input: None
+ * Return value: None
+*/
 void MFRC522_Init(void)
 {
 	digitalWrite(NRSTPD,HIGH);
@@ -379,32 +324,32 @@ void MFRC522_Init(void)
     Write_MFRC522(TReloadRegH, 0);
 	
 	Write_MFRC522(TxAutoReg, 0x40);		//100%ASK
-	Write_MFRC522(ModeReg, 0x3D);		//CRC初始值0x6363	???
+	Write_MFRC522(ModeReg, 0x3D);		//CRC Initial value 0x6363	???
 
 	//ClearBitMask(Status2Reg, 0x08);		//MFCrypto1On=0
 	//Write_MFRC522(RxSelReg, 0x86);		//RxWait = RxSelReg[5..0]
 	//Write_MFRC522(RFCfgReg, 0x7F);   		//RxGain = 48dB
 
-	AntennaOn();		//打开天线
+	AntennaOn();		//Open the antenna
 }
 
 
 /*
- * 函 数 名：MFRC522_Request
- * 功能描述：寻卡，读取卡类型号
- * 输入参数：reqMode--寻卡方式，
- *			 TagType--返回卡片类型
+ * Function Nameï¼šMFRC522_Request
+ * Description: Find cards, read the card type number
+ * Input parameters: reqMode - find cards way
+ *			 TagType - Return Card Type
  *			 	0x4400 = Mifare_UltraLight
  *				0x0400 = Mifare_One(S50)
  *				0x0200 = Mifare_One(S70)
  *				0x0800 = Mifare_Pro(X)
  *				0x4403 = Mifare_DESFire
- * 返 回 值：成功返回MI_OK
+ * Return value: the successful return MI_OK
  */
 uchar MFRC522_Request(uchar reqMode, uchar *TagType)
 {
 	uchar status;  
-	uint backBits;			//接收到的数据位数
+	uint backBits;			//The received data bits
 
 	Write_MFRC522(BitFramingReg, 0x07);		//TxLastBists = BitFramingReg[2..0]	???
 	
@@ -421,14 +366,14 @@ uchar MFRC522_Request(uchar reqMode, uchar *TagType)
 
 
 /*
- * 函 数 名：MFRC522_ToCard
- * 功能描述：RC522和ISO14443卡通讯
- * 输入参数：command--MF522命令字，
- *			 sendData--通过RC522发送到卡片的数据, 
- *			 sendLen--发送的数据长度		 
- *			 backData--接收到的卡片返回数据，
- *			 backLen--返回数据的位长度
- * 返 回 值：成功返回MI_OK
+ * Function Name: MFRC522_ToCard
+ * Description: RC522 and ISO14443 card communication
+ * Input Parameters: command - MF522 command word,
+ *			 sendData--RC522 sent to the card by the data
+ *			 sendLen--Length of data sent	 
+ *			 backData--Received the card returns data,
+ *			 backLen--Return data bit length
+ * Return value: the successful return MI_OK
  */
 uchar MFRC522_ToCard(uchar command, uchar *sendData, uchar sendLen, uchar *backData, uint *backLen)
 {
@@ -441,13 +386,13 @@ uchar MFRC522_ToCard(uchar command, uchar *sendData, uchar sendLen, uchar *backD
 
     switch (command)
     {
-        case PCD_AUTHENT:		//认证卡密
+        case PCD_AUTHENT:		//Certification cards close
 		{
 			irqEn = 0x12;
 			waitIRq = 0x10;
 			break;
 		}
-		case PCD_TRANSCEIVE:	//发送FIFO中数据
+		case PCD_TRANSCEIVE:	//Transmit FIFO data
 		{
 			irqEn = 0x77;
 			waitIRq = 0x30;
@@ -457,27 +402,27 @@ uchar MFRC522_ToCard(uchar command, uchar *sendData, uchar sendLen, uchar *backD
 			break;
     }
    
-    Write_MFRC522(CommIEnReg, irqEn|0x80);	//允许中断请求
-    ClearBitMask(CommIrqReg, 0x80);			//清除所有中断请求位
-    SetBitMask(FIFOLevelReg, 0x80);			//FlushBuffer=1, FIFO初始化
+    Write_MFRC522(CommIEnReg, irqEn|0x80);	//Interrupt request
+    ClearBitMask(CommIrqReg, 0x80);			//Clear all interrupt request bit
+    SetBitMask(FIFOLevelReg, 0x80);			//FlushBuffer=1, FIFO Initialization
     
-	Write_MFRC522(CommandReg, PCD_IDLE);	//NO action;取消当前命令	???
+	Write_MFRC522(CommandReg, PCD_IDLE);	//NO action; Cancel the current command???
 
-	//向FIFO中写入数据
+	//Writing data to the FIFO
     for (i=0; i<sendLen; i++)
     {   
 		Write_MFRC522(FIFODataReg, sendData[i]);    
 	}
 
-	//执行命令
+	//Execute the command
 	Write_MFRC522(CommandReg, command);
     if (command == PCD_TRANSCEIVE)
     {    
 		SetBitMask(BitFramingReg, 0x80);		//StartSend=1,transmission of data starts  
 	}   
     
-	//等待接收数据完成
-	i = 2000;	//i根据时钟频率调整，操作M1卡最大等待时间25ms	???
+	//Waiting to receive data to complete
+	i = 2000;	//i according to the clock frequency adjustment, the operator M1 card maximum waiting time 25ms???
     do 
     {
 		//CommIrqReg[7..0]
@@ -521,7 +466,7 @@ uchar MFRC522_ToCard(uchar command, uchar *sendData, uchar sendLen, uchar *backD
 					n = MAX_LEN;   
 				}
 				
-				//读取FIFO中接收到的数据
+				//Reading the received data in FIFO
                 for (i=0; i<n; i++)
                 {   
 					backData[i] = Read_MFRC522(FIFODataReg);    
@@ -543,10 +488,10 @@ uchar MFRC522_ToCard(uchar command, uchar *sendData, uchar sendLen, uchar *backD
 
 
 /*
- * 函 数 名：MFRC522_Anticoll
- * 功能描述：防冲突检测，读取选中卡片的卡序列号
- * 输入参数：serNum--返回4字节卡序列号,第5字节为校验字节
- * 返 回 值：成功返回MI_OK
+ * Function Name: MFRC522_Anticoll
+ * Description: Anti-collision detection, reading selected card serial number card
+ * Input parameters: serNum - returns 4 bytes card serial number, the first 5 bytes for the checksum byte
+ * Return value: the successful return MI_OK
  */
 uchar MFRC522_Anticoll(uchar *serNum)
 {
@@ -566,7 +511,7 @@ uchar MFRC522_Anticoll(uchar *serNum)
 
     if (status == MI_OK)
 	{
-		//校验卡序列号
+		//Check card serial number
 		for (i=0; i<4; i++)
 		{   
 		 	serNumCheck ^= serNum[i];
@@ -584,27 +529,27 @@ uchar MFRC522_Anticoll(uchar *serNum)
 
 
 /*
- * 函 数 名：CalulateCRC
- * 功能描述：用MF522计算CRC
- * 输入参数：pIndata--要读数CRC的数据，len--数据长度，pOutData--计算的CRC结果
- * 返 回 值：无
+ * Function Name: CalulateCRC
+ * Description: CRC calculation with MF522
+ * Input parameters: pIndata - To read the CRC data, len - the data length, pOutData - CRC calculation results
+ * Return value: None
  */
 void CalulateCRC(uchar *pIndata, uchar len, uchar *pOutData)
 {
     uchar i, n;
 
     ClearBitMask(DivIrqReg, 0x04);			//CRCIrq = 0
-    SetBitMask(FIFOLevelReg, 0x80);			//清FIFO指针
+    SetBitMask(FIFOLevelReg, 0x80);			//Clear the FIFO pointer
     //Write_MFRC522(CommandReg, PCD_IDLE);
 
-	//向FIFO中写入数据	
+	//Writing data to the FIFO	
     for (i=0; i<len; i++)
     {   
 		Write_MFRC522(FIFODataReg, *(pIndata+i));   
 	}
     Write_MFRC522(CommandReg, PCD_CALCCRC);
 
-	//等待CRC计算完成
+	//Wait CRC calculation is complete
     i = 0xFF;
     do 
     {
@@ -613,17 +558,17 @@ void CalulateCRC(uchar *pIndata, uchar len, uchar *pOutData)
     }
     while ((i!=0) && !(n&0x04));			//CRCIrq = 1
 
-	//读取CRC计算结果
+	//Read CRC calculation result
     pOutData[0] = Read_MFRC522(CRCResultRegL);
     pOutData[1] = Read_MFRC522(CRCResultRegM);
 }
 
 
 /*
- * 函 数 名：MFRC522_SelectTag
- * 功能描述：选卡，读取卡存储器容量
- * 输入参数：serNum--传入卡序列号
- * 返 回 值：成功返回卡容量
+ * Function Name: MFRC522_SelectTag
+ * Description: election card, read the card memory capacity
+ * Input parameters: serNum - Incoming card serial number
+ * Return value: the successful return of card capacity
  */
 uchar MFRC522_SelectTag(uchar *serNum)
 {
@@ -658,15 +603,15 @@ uchar MFRC522_SelectTag(uchar *serNum)
 
 
 /*
- * 函 数 名：MFRC522_Auth
- * 功能描述：验证卡片密码
- * 输入参数：authMode--密码验证模式
-                 0x60 = 验证A密钥
-                 0x61 = 验证B密钥 
-             BlockAddr--块地址
-             Sectorkey--扇区密码
-             serNum--卡片序列号，4字节
- * 返 回 值：成功返回MI_OK
+ * Function Name: MFRC522_Auth
+ * Description: Verify card password
+ * Input parameters: authMode - Password Authentication Mode
+                 0x60 = A key authentication
+                 0x61 = Authentication Key B
+             BlockAddr--Block address
+             Sectorkey--Sector password
+             serNum--Card serial number, 4-byte
+ * Return value: the successful return MI_OK
  */
 uchar MFRC522_Auth(uchar authMode, uchar BlockAddr, uchar *Sectorkey, uchar *serNum)
 {
@@ -675,7 +620,7 @@ uchar MFRC522_Auth(uchar authMode, uchar BlockAddr, uchar *Sectorkey, uchar *ser
     uchar i;
 	uchar buff[12]; 
 
-	//验证指令+块地址＋扇区密码＋卡序列号
+	//Verify the command block address + sector + password + card serial number
     buff[0] = authMode;
     buff[1] = BlockAddr;
     for (i=0; i<6; i++)
@@ -698,10 +643,10 @@ uchar MFRC522_Auth(uchar authMode, uchar BlockAddr, uchar *Sectorkey, uchar *ser
 
 
 /*
- * 函 数 名：MFRC522_Read
- * 功能描述：读块数据
- * 输入参数：blockAddr--块地址;recvData--读出的块数据
- * 返 回 值：成功返回MI_OK
+ * Function Name: MFRC522_Read
+ * Description: Read block data
+ * Input parameters: blockAddr - block address; recvData - read block data
+ * Return value: the successful return MI_OK
  */
 uchar MFRC522_Read(uchar blockAddr, uchar *recvData)
 {
@@ -723,10 +668,10 @@ uchar MFRC522_Read(uchar blockAddr, uchar *recvData)
 
 
 /*
- * 函 数 名：MFRC522_Write
- * 功能描述：写块数据
- * 输入参数：blockAddr--块地址;writeData--向块写16字节数据
- * 返 回 值：成功返回MI_OK
+ * Function Name: MFRC522_Write
+ * Description: Write block data
+ * Input parameters: blockAddr - block address; writeData - to 16-byte data block write
+ * Return value: the successful return MI_OK
  */
 uchar MFRC522_Write(uchar blockAddr, uchar *writeData)
 {
@@ -747,7 +692,7 @@ uchar MFRC522_Write(uchar blockAddr, uchar *writeData)
         
     if (status == MI_OK)
     {
-        for (i=0; i<16; i++)		//向FIFO写16Byte数据
+        for (i=0; i<16; i++)		//Data to the FIFO write 16Byte
         {    
         	buff[i] = *(writeData+i);   
         }
@@ -765,10 +710,10 @@ uchar MFRC522_Write(uchar blockAddr, uchar *writeData)
 
 
 /*
- * 函 数 名：MFRC522_Halt
- * 功能描述：命令卡片进入休眠状态
- * 输入参数：无
- * 返 回 值：无
+ * Function Name: MFRC522_Halt
+ * Description: Command card into hibernation
+ * Input: None
+ * Return value: None
  */
 void MFRC522_Halt(void)
 {
