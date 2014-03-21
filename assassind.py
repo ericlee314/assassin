@@ -16,6 +16,9 @@ class Player:
 		self.kills = kills
 		self.deaths = deaths
 
+	def __str__(self):
+		return "{0} {1} {2}".format(self.name, self.kills, self.deaths)
+
 	def kill(self):
 		self.kills += 1
 		self.score += 1
@@ -33,9 +36,9 @@ class Assassin_Daemon:
 
 	def kill(self, killer, victim):
 		for p in self.data:
-			if p.ident == killer:
+			if p.ident == int(killer):
 				p.kill()
-			elif p.ident == victim:
+			if p.ident == int(victim):
 				p.die()
 
 	def load_data_file(self):
@@ -49,7 +52,7 @@ class Assassin_Daemon:
 		with open(self.file_name, "w") as f:
 			self.data.sort(cmp = lambda x, y: x.score - y.score)
 
-			f.writelines(["{0} {1} {2} {3} {4} {5}".format(p.name, p.ip, p.ident, p.score, p.kills, p.deaths) for p in self.data])
+			f.writelines(["{0} {1} {2} {3} {4} {5}\n".format(p.name, p.ip, p.ident, p.score, p.kills, p.deaths) for p in self.data])
 
 	def run(self):
 		self.load_data_file()
@@ -64,6 +67,9 @@ class Assassin_Daemon:
 		s.bind((host, port))
 		s.listen(backlog)
 		while True:
+			for p in self.data:
+				print p
+
 			client, address = s.accept()
 			data = client.recv(size)
 			if data:
