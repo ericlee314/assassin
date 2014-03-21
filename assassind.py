@@ -1,17 +1,17 @@
 from socket import *
 
 class Player:
-	self.name = None
-	self.ip = None
-	self.id = None
-	self.score = None
-	self.kills = None
-	self.deaths = None
+	name = None
+	ip = None
+	ident = None
+	score = None
+	kills = None
+	deaths = None
 
 	def __init__(self, name, ip, ident, kills, deaths):
 		self.name = name
 		self.ip = ip
-		self.id = ident
+		self.ident = ident
 		self.score = kills - deaths
 		self.kills = kills
 		self.deaths = deaths
@@ -25,34 +25,34 @@ class Player:
 		self.score -= 1
 
 class Assassin_Daemon:
-	self.file_name = ""
-	self.data = []
+	file_name = ""
+	data = []
 
 	def __init__(self, data_file_name):
 		self.file_name = data_file_name
 
 	def kill(self, killer, victim):
 		for p in self.data:
-			if p.id == killer:
+			if p.ident == killer:
 				p.kill()
-			elif p.id == victim:
+			elif p.ident == victim:
 				p.die()
 
 	def load_data_file(self):
 		with open(self.file_name, "r") as f:
 			for line in f:
-				player_data = split(line)
+				player_data = line.split()
 
-				self.data += [Player(player_data[0], player_data[1], player_data[2], player_data[4], player_data[5])]
+				self.data += [Player(player_data[0], player_data[1], int(player_data[2]), int(player_data[4]), int(player_data[5]))]
 
 	def save_data_file(self):
 		with open(self.file_name, "w") as f:
 			self.data.sort(cmp = lambda x, y: x.score - y.score)
 
-			f.writelines(["{0} {1} {2} {3} {4} {5}".format(p.name, p.ip, p.id, p.score, p.kills, p.deaths) for p in self.data])
+			f.writelines(["{0} {1} {2} {3} {4} {5}".format(p.name, p.ip, p.ident, p.score, p.kills, p.deaths) for p in self.data])
 
 	def run(self):
-		self.load_data_file(self.file_name)
+		self.load_data_file()
 
 		s = socket(AF_INET, SOCK_STREAM)
 
@@ -67,14 +67,16 @@ class Assassin_Daemon:
 			client, address = s.accept()
 			data = client.recv(size)
 			if data:
-				msg = str(data)[2:-1]
+				msg = str(data)
 
 				client.send(msg)
 				print "Recieved:", str(msg)
 
-				cmd = split(msg)
+				cmd = msg.split()
 				if cmd[0] == "kill":
 					self.kill(*cmd[1:])
 
 				self.save_data_file()
 			client.close()
+
+Assassin_Daemon("data").run()
