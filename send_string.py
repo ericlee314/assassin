@@ -7,5 +7,5 @@ s.send(bytes(argv[2], "UTF-8"))
 reply = s.recv(1024)
 while not reply:
 	reply = s.recv(1024)
-print("Server replied:", str(reply)[2:-1])
+print "Server replied:", str(reply)[2:-1]
 s.close()
